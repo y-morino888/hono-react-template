@@ -4,10 +4,9 @@ import { api } from "./api.js";
 
 const app = new Hono();
 
-app.get("/", (c) => {
-  return c.text("Hello Hono!");
-});
+app.get("/", (c) => c.text("Hello Hono!"));
 
+// ここで /api 配下に api.ts のルートをまとめてマウント
 app.route("/api", api);
 
 serve(

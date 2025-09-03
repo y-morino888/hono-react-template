@@ -10,9 +10,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Sample {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String?
-  createdAt DateTime @default(now())
+// 掲示板のスレッド
+model Thread {
+  id         String     @id @default(cuid())  // thread_id
+  title      String
+  createdAt  DateTime   @default(now())
+  comments   Comment[]
+  deletes    DeleteRequest[]
+}
+
+// コメント（レス）
+model Comment {
+  id        String   @id @default(cuid())     // comment_id
+  user      String   @default("名無し")       // 名前欄
+  email     String?                          // E-mail欄
+  content   String                           // 本文
+  createdAt DateTime @default(now())         // 投稿日時
+
+  thread    Thread   @relation(fields: [threadId], references: [id])
+  threadId  String
+
+  deletes   DeleteRequest[]
+}
+
+// 削除依頼
+model DeleteRequest {
+  id         Int      @id @default(autoincrement())
+  reason     String                           // 理由
+  createdAt  DateTime @default(now())
+
+  thread     Thread?  @relation(fields: [threadId], references: [id])
+  threadId   String?
+
+  comment    Comment? @relation(fields: [commentId], references: [id])
+  commentId  String?
+}
+
+// 管理者
+model Admin {
+  id        Int     @id @default(autoincrement())
+  username  String  @unique
+  password  String  // ハッシュ化して保存
 }
