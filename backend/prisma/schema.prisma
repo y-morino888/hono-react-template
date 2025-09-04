@@ -10,6 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/* 既存：サンプル */
 model Sample {
   id        Int      @id @default(autoincrement())
   title     String
@@ -17,45 +18,46 @@ model Sample {
   createdAt DateTime @default(now())
 }
 
-// コメント（レス）
+/* コメント（レス） */
 model Comment {
-  id        String   @id @default(cuid())     // comment_id
-  userId    String                          // 投稿者ID (任意)
-  user      String   @default("名無し")       // 名前欄
-  email     String?                          // E-mail欄
-  content   String                           // 本文
-  createdAt DateTime @default(now())         // 投稿日時
+  id        String   @id @default(cuid())     // DB内部用の一意ID（文字列）
+  userId    String                            // ← 表示用のユーザーID（IP+日付で生成して保存）
+  user      String   @default("名無し")        // 名前欄
+  email     String?                           // E-mail欄
+  content   String                            // 本文
+  createdAt DateTime @default(now())          // 投稿日時
 
-  thread    Thread   @relation(fields: [threadId], references: [id])
   threadId  String
+  thread    Thread   @relation(fields: [threadId], references: [id])
 
   deletes   DeleteRequest[]
 }
 
-// 削除依頼
+/* 削除依頼（スレ or レスに紐付く可能性あり） */
 model DeleteRequest {
-  id         Int      @id @default(autoincrement())
-  reason     String                           // 理由
-  createdAt  DateTime @default(now())
+  id         Int       @id @default(autoincrement())
+  reason     String
+  createdAt  DateTime  @default(now())
 
-  thread     Thread?  @relation(fields: [threadId], references: [id])
   threadId   String?
+  thread     Thread?   @relation(fields: [threadId], references: [id])
 
-  comment    Comment? @relation(fields: [commentId], references: [id])
   commentId  String?
+  comment    Comment?  @relation(fields: [commentId], references: [id])
 }
 
-// 管理者
+/* 管理者 */
 model Admin {
   id        Int     @id @default(autoincrement())
   username  String  @unique
   password  String  // ハッシュ化して保存
 }
 
+/* スレッド */
 model Thread {
-  id        String    @id @default(cuid())
+  id        String        @id @default(cuid()) // 文字列ID（フロント定義と一致）
   title     String
-  createdAt DateTime  @default(now())
+  createdAt DateTime      @default(now())
 
   comments  Comment[]
   deletes   DeleteRequest[]
