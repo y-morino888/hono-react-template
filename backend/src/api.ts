@@ -1,9 +1,12 @@
 // backend/src/api.ts
 import { Hono } from "hono";
 import prisma from "./db.js";
+import { cors } from "hono/cors";
 import { createHash } from "node:crypto";
 
 export const api = new Hono();
+
+api.use("/*", cors()); // CORS有効化
 
 /* ========= 動作確認 ========= */
 api.get("/hello", (c) => c.json({ message: "Hello API!" }));
