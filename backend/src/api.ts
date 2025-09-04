@@ -11,36 +11,47 @@ api.get("/hello", (c) => c.json({ message: "Hello API!" }));
 /* ========= Samples ========= */
 // 一覧
 api.get("/samples", async (c) => {
-  const samples = await prisma.sample.findMany({ orderBy: { id: "desc" } });
-  return c.json(samples);
+  try {
+    const samples = await prisma.sample.findMany({ orderBy: { id: "desc" } });
+    return c.json(samples);
+  } catch (error) {
+    console.error("🔥 samples一覧エラー:", error);
+    return c.json({ error: "取得に失敗しました" }, 500);
+  }
 });
 
 // 単体取得（Sample は Int 主キー）
 api.get("/samples/:id", async (c) => {
   const id = Number(c.req.param("id"));
-  const sample = await prisma.sample.findUnique({ where: { id } });
-  if (!sample) return c.json({ error: "Not found" }, 404);
-  return c.json(sample);
+  if (isNaN(id)) return c.json({ error: "Invalid id" }, 400);
+  try {
+    const sample = await prisma.sample.findUnique({ where: { id } });
+    if (!sample) return c.json({ error: "Not found" }, 404);
+    return c.json(sample);
+  } catch (error) {
+    console.error("🔥 sample取得エラー:", error);
+    return c.json({ error: "取得に失敗しました" }, 500);
+  }
 });
 
 /* ========= Threads / Comments ========= */
 
-// スレッド一覧（最新が先）+ コメントも含める（古い順）
+// スレッド一覧（最新順）+ コメントも含める（古い順）
 api.get("/threads", async (c) => {
   try {
     const threads = await prisma.thread.findMany({
       orderBy: { createdAt: "desc" },
       include: {
         comments: {
-          orderBy: { createdAt: "asc" }, // 古い順に
-          take: 3, // 最新3件とかにするならここを調整
+          orderBy: { createdAt: "asc" }, // 古い順
+          take: 3, // プレビュー用に最新3件
         },
       },
     });
     return c.json(threads);
   } catch (error) {
-    console.error(error);
-    return c.json({ error: "スレッド取得に失敗しました" }, 500);
+    console.error("🔥 threads一覧エラー:", error);
+    return c.json({ error: "スレッド一覧取得に失敗しました" }, 500);
   }
 });
 
@@ -56,9 +67,7 @@ api.get("/threads/:threadId", async (c) => {
         },
       },
     });
-    if (!thread) {
-      return c.json({ error: "Not found" }, 404);
-    }
+    if (!thread) return c.json({ error: "Not found" }, 404);
     return c.json(thread);
   } catch (error) {
     console.error("🔥 thread取得エラー:", error);
@@ -66,12 +75,11 @@ api.get("/threads/:threadId", async (c) => {
   }
 });
 
-
 // スレッド作成（最初のコメント付き）
 api.post("/threads", async (c) => {
   const body = await c.req.json<{
-    title: string;
-    content: string;
+    title?: string;
+    content?: string;
     user?: string;
     email?: string;
   }>();
@@ -97,7 +105,7 @@ api.post("/threads", async (c) => {
             content: body.content,
             user: body.user || "名無し",
             email: body.email,
-            userId, // ← 保存
+            userId,
           },
         },
       },
@@ -128,13 +136,13 @@ api.get("/threads/:threadId/comments", async (c) => {
 // コメント投稿
 api.post("/threads/:threadId/comments", async (c) => {
   const threadId = c.req.param("threadId");
-  const { content, user, email } = await c.req.json<{
-    content: string;
+  const body = await c.req.json<{
+    content?: string;
     user?: string;
     email?: string;
   }>();
 
-  if (!content) return c.json({ error: "content is required" }, 400);
+  if (!body.content) return c.json({ error: "content is required" }, 400);
 
   // 表示用 User ID（同一日×同一IPで同じ値）
   const ip =
@@ -148,10 +156,10 @@ api.post("/threads/:threadId/comments", async (c) => {
     const comment = await prisma.comment.create({
       data: {
         threadId,
-        content,
-        user: user || "名無し",
-        email,
-        userId, // ← 保存
+        content: body.content,
+        user: body.user || "名無し",
+        email: body.email,
+        userId,
       },
     });
     return c.json(comment, 201);
