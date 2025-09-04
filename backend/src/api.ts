@@ -42,18 +42,21 @@ api.get("/threads", async (c) => {
 });
 
 // スレッド単体（コメント付き）
-api.get("/threads/:threadId", async (c) => {
-  const threadId = c.req.param("threadId");
+api.get("/threads", async (c) => {
   try {
-    const thread = await prisma.thread.findUnique({
-      where: { id: threadId },
-      include: { comments: { orderBy: { createdAt: "asc" } } },
+    const threads = await prisma.thread.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        comments: {
+          orderBy: { createdAt: "desc" },
+          take: 3, // 最新3件だけ
+        },
+      },
     });
-    if (!thread) return c.json({ error: "Not found" }, 404);
-    return c.json(thread);
+    return c.json(threads);
   } catch (error) {
-    console.error("🔥 thread取得エラー:", error);
-    return c.json({ error: "取得に失敗しました" }, 500);
+    console.error(error);
+    return c.json({ error: "スレッド取得に失敗しました" }, 500);
   }
 });
 
