@@ -1,9 +1,12 @@
 // backend/src/api.ts
 import { Hono } from "hono";
 import prisma from "./db.js";
+import { cors } from "hono/cors";
 import { createHash } from "node:crypto";
 
 export const api = new Hono();
+
+api.use("/*", cors()); // CORS有効化
 
 /* ========= 動作確認 ========= */
 api.get("/hello", (c) => c.json({ message: "Hello API!" }));
@@ -163,8 +166,71 @@ api.post("/threads/:threadId/comments", async (c) => {
       },
     });
     return c.json(comment, 201);
+
+
   } catch (error) {
     console.error("🔥 comment作成エラー:", error);
     return c.json({ error: "コメント作成に失敗しました" }, 500);
+  }
+});
+// コメント投稿
+api.post("/threads/:threadId/comments", async (c) => {
+  const threadId = c.req.param("threadId");
+  const { content, user, email } = await c.req.json<{
+    content: string;
+    user?: string;
+    email?: string;
+  }>();
+
+  if (!content) return c.json({ error: "content is required" }, 400);
+
+  // 表示用 User ID（同一日×同一IPで同じ値）
+  const ip =
+    c.req.header("x-forwarded-for") ||
+    c.req.header("x-real-ip") ||
+    "0.0.0.0";
+  const today = new Date().toISOString().slice(0, 10);
+  const userId = createHash("sha1").update(ip + today).digest("hex").slice(0, 8);
+
+  try {
+    const comment = await prisma.comment.create({
+      data: {
+        threadId,
+        content,
+        user: user || "名無し",
+        email,
+        userId, // ← 保存
+      },
+    });
+    return c.json(comment, 201);
+  } catch (error) {
+    console.error("🔥 comment作成エラー:", error);
+    return c.json({ error: "コメント作成に失敗しました" }, 500);
+  }
+});
+
+
+// コメント削除（管理者用 → あぼーん化）
+api.delete("/threads/:threadId/comments/:commentId", async (c) => {
+  const { commentId } = c.req.param();
+
+  // 認証トークン確認
+  const token = c.req.header("authorization");
+  if (token !== `Bearer ${process.env.ADMIN_TOKEN}`) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    await prisma.comment.update({
+      where: { id: commentId },
+      data: {
+        content: "あぼーん",
+        user: "あぼーん",
+      },
+    });
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("🔥 commentあぼーんエラー:", error);
+    return c.json({ error: "コメントのあぼーんに失敗しました" }, 500);
   }
 });
