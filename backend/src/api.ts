@@ -4,6 +4,17 @@ import prisma from "./db.js";
 import { cors } from "hono/cors";
 import { createHash } from "node:crypto";
 
+// 日付を "YYYY-MM-DD" 形式で取得
+function getTodayString() {
+  const now = new Date();
+  return now.toISOString().slice(0, 10);
+}
+
+// 投稿者ID生成（IP＋日付で8文字ハッシュ）
+function generateUserId(ip: string) {
+  return createHash("sha1").update(ip + getTodayString()).digest("hex").slice(0, 8);
+}
+
 export const api = new Hono();
 
 api.use("/*", cors()); // CORS有効化
@@ -96,8 +107,7 @@ api.post("/threads", async (c) => {
     c.req.header("x-forwarded-for") ||
     c.req.header("x-real-ip") ||
     "0.0.0.0";
-  const today = new Date().toISOString().slice(0, 10);
-  const userId = createHash("sha1").update(ip + today).digest("hex").slice(0, 8);
+  const userId = generateUserId(ip); // ← ここを変更
 
   try {
     const thread = await prisma.thread.create({
@@ -120,8 +130,6 @@ api.post("/threads", async (c) => {
     return c.json({ error: "スレッド作成に失敗しました" }, 500);
   }
 });
-
-
 
 // コメント一覧
 api.get("/threads/:threadId/comments", async (c) => {
@@ -162,13 +170,10 @@ api.post("/threads/:threadId/comments", async (c) => {
     "0.0.0.0";
   const ip = normalizeIp(rawIp);
 
-  // JSTの日付を利用
-  const today = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+  // ID生成（JST日付→UTC日付に統一）
+  const userId = generateUserId(ip); // ← ここを変更
 
-  // ID生成
-  const userId = createHash("sha1").update(ip + today).digest("hex").slice(0, 8);
-
-  console.log("📡 投稿IP:", ip, "日付:", today, "生成ID:", userId);
+  console.log("📡 投稿IP:", ip, "生成ID:", userId);
 
   try {
     const comment = await prisma.comment.create({
