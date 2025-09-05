@@ -121,6 +121,8 @@ api.post("/threads", async (c) => {
   }
 });
 
+
+
 // コメント一覧
 api.get("/threads/:threadId/comments", async (c) => {
   const threadId = c.req.param("threadId");
@@ -136,43 +138,7 @@ api.get("/threads/:threadId/comments", async (c) => {
   }
 });
 
-// コメント投稿
-api.post("/threads/:threadId/comments", async (c) => {
-  const threadId = c.req.param("threadId");
-  const body = await c.req.json<{
-    content?: string;
-    user?: string;
-    email?: string;
-  }>();
 
-  if (!body.content) return c.json({ error: "content is required" }, 400);
-
-  // 表示用 User ID（同一日×同一IPで同じ値）
-  const ip =
-    c.req.header("x-forwarded-for") ||
-    c.req.header("x-real-ip") ||
-    "0.0.0.0";
-  const today = new Date().toISOString().slice(0, 10);
-  const userId = createHash("sha1").update(ip + today).digest("hex").slice(0, 8);
-
-  try {
-    const comment = await prisma.comment.create({
-      data: {
-        threadId,
-        content: body.content,
-        user: body.user || "名無し",
-        email: body.email,
-        userId,
-      },
-    });
-    return c.json(comment, 201);
-
-
-  } catch (error) {
-    console.error("🔥 comment作成エラー:", error);
-    return c.json({ error: "コメント作成に失敗しました" }, 500);
-  }
-});
 // コメント投稿
 api.post("/threads/:threadId/comments", async (c) => {
   const threadId = c.req.param("threadId");
@@ -184,13 +150,25 @@ api.post("/threads/:threadId/comments", async (c) => {
 
   if (!content) return c.json({ error: "content is required" }, 400);
 
-  // 表示用 User ID（同一日×同一IPで同じ値）
-  const ip =
+  // IP正規化
+  function normalizeIp(ip: string) {
+    if (ip === "::1") return "127.0.0.1";
+    return ip;
+  }
+
+  const rawIp =
     c.req.header("x-forwarded-for") ||
     c.req.header("x-real-ip") ||
     "0.0.0.0";
-  const today = new Date().toISOString().slice(0, 10);
+  const ip = normalizeIp(rawIp);
+
+  // JSTの日付を利用
+  const today = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+
+  // ID生成
   const userId = createHash("sha1").update(ip + today).digest("hex").slice(0, 8);
+
+  console.log("📡 投稿IP:", ip, "日付:", today, "生成ID:", userId);
 
   try {
     const comment = await prisma.comment.create({
@@ -199,7 +177,7 @@ api.post("/threads/:threadId/comments", async (c) => {
         content,
         user: user || "名無し",
         email,
-        userId, // ← 保存
+        userId,
       },
     });
     return c.json(comment, 201);
