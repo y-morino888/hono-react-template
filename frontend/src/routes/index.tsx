@@ -12,8 +12,10 @@ type Thread = {
   id: string;
   title: string;
   createdAt: string;
+  latestCommentAt: string;
   comments: Comment[];
 };
+
 
 export const Index: React.FC = () => {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -40,18 +42,34 @@ export const Index: React.FC = () => {
     // eslint-disable-next-line
   }, []);
 
-  const fetchThreads = async () => {
-    try {
-      const res = await fetch("http://localhost:8787/api/threads");
-      const data = await res.json();
-      const threadsArray = Array.isArray(data) ? data : Object.values(data);
-      setThreads(threadsArray);
-    } catch (err) {
-      console.error("スレッド取得失敗:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchThreads = async () => {
+  try {
+    const res = await fetch("http://localhost:8787/api/threads");
+    const data = await res.json();
+    const threadsArray: Thread[] = Array.isArray(data) ? data : Object.values(data);
+
+    const getLatestTime = (thread: Thread) => {
+      if (thread.comments?.length) {
+        return Math.max(
+          ...thread.comments.map((c) => new Date(c.createdAt).getTime())
+        );
+      }
+      return new Date(thread.createdAt).getTime();
+    };
+
+    threadsArray.sort(
+      (a, b) =>
+        new Date(b.latestCommentAt).getTime() - new Date(a.latestCommentAt).getTime()
+    );
+
+    setThreads([...threadsArray]); // コピーして state にセット
+  } catch (err) {
+    console.error("スレッド取得失敗:", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // スレッド作成
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,46 +140,60 @@ export const Index: React.FC = () => {
         {paginatedThreads.length === 0 ? (
           <div className="text-gray-500">スレッドがありません。</div>
         ) : (
-          paginatedThreads.map((thread) => (
-            <div key={thread.id} className="border-b pb-4">
-              <Link
-                to={`/threads/${thread.id}`}
-                className="text-blue-600 font-semibold hover:underline"
-              >
-                {thread.title}
-              </Link>
-              <div className="mt-2 space-y-1">
-                {thread.comments && thread.comments.length > 0 ? (
-                  thread.comments.map((c) => {
-                    const isAboned =
-                      c.user === "あぼーん" || c.content === "あぼーん";
-                    return (
-                      <div
-                        key={c.id}
-                        className="text-sm text-gray-700 border-b pb-1"
-                      >
-                        {isAboned ? (
-                          <div className="text-gray-400 italic">あぼーん</div>
-                        ) : (
-                          <>
-                            <span className="font-semibold">{c.user}</span>:{" "}
-                            {c.content}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    まだコメントはありません
-                  </div>
-                )}
+          paginatedThreads.map((thread) => {
+            // 最新コメントの日時（なければスレッド作成日時）
+            const latestComment = thread.comments?.length
+              ? thread.comments[thread.comments.length - 1]
+              : null;
+            const latestTime = latestComment
+              ? new Date(latestComment.createdAt).toLocaleString()
+              : new Date(thread.createdAt).toLocaleString();
+
+            return (
+              <div key={thread.id} className="border-b pb-4">
+                <Link
+                  to={`/threads/${thread.id}`}
+                  className="text-blue-600 font-semibold hover:underline"
+                >
+                  {thread.title}
+                </Link>
+                <div className="mt-2 space-y-1">
+                  {thread.comments && thread.comments.length > 0 ? (
+                    thread.comments.map((c) => {
+                      const isAboned =
+                        c.user === "あぼーん" || c.content === "あぼーん";
+                      return (
+                        <div
+                          key={c.id}
+                          className="text-sm text-gray-700 border-b pb-1"
+                        >
+                          {isAboned ? (
+                            <div className="text-gray-400 italic">あぼーん</div>
+                          ) : (
+                            <>
+                              <span className="font-semibold">{c.user}</span>:{" "}
+                              {c.content}
+                              <span className="ml-2 text-xs text-gray-400">
+                                {new Date(c.createdAt).toLocaleString()}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-sm text-gray-500">
+                      まだコメントはありません
+                    </div>
+                  )}
+                </div>
+                {/* スレッドの最新コメント日時 or 作成日時 */}
+                <div className="text-xs text-gray-500">
+                  最新: {latestTime}
+                </div>
               </div>
-              <div className="text-xs text-gray-500">
-                {new Date(thread.createdAt).toLocaleString()}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
