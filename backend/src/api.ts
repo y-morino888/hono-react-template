@@ -50,7 +50,7 @@ api.get("/samples/:id", async (c) => {
 
 /* ========= Threads / Comments ========= */
 
-// スレッド一覧（最新順）+ コメントも含める（古い順）
+// スレッド一覧
 api.get("/threads", async (c) => {
   try {
     const threads = await prisma.thread.findMany({
@@ -58,16 +58,34 @@ api.get("/threads", async (c) => {
       include: {
         comments: {
           orderBy: { createdAt: "asc" }, // 古い順
-          take: 3, // プレビュー用に最新3件
+          take: 3, // 最初の3件を表示用に
         },
+        _count: true, // コメント数を取る場合にも便利
       },
     });
-    return c.json(threads);
+
+    // 各スレッドの最新コメント日時を計算して追加
+    const enrichedThreads = await Promise.all(
+      threads.map(async (t) => {
+        const latest = await prisma.comment.findFirst({
+          where: { threadId: t.id },
+          orderBy: { createdAt: "desc" }, // 新しい順
+          select: { createdAt: true },
+        });
+        return {
+          ...t,
+          latestCommentAt: latest ? latest.createdAt : t.createdAt,
+        };
+      })
+    );
+
+    return c.json(enrichedThreads);
   } catch (error) {
     console.error("🔥 threads一覧エラー:", error);
     return c.json({ error: "スレッド一覧取得に失敗しました" }, 500);
   }
 });
+
 
 // スレッド単体（コメント付き）
 api.get("/threads/:threadId", async (c) => {
