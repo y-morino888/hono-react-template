@@ -71,10 +71,16 @@ const ThreadDetail: React.FC = () => {
       <div className="space-y-4">
         {thread.comments.map((c) => (
           <div key={c.id} className="border-b pb-2">
-            <span className="font-semibold">{c.user}</span>: {c.content}
-            <div className="text-xs text-gray-500">
-              {new Date(c.createdAt).toLocaleString()}
-            </div>
+            {c.user === "あぼーん" || c.content === "あぼーん" ? (
+              <div className="text-gray-400 italic">あぼーん</div>
+            ) : (
+              <>
+                <span className="font-semibold">{c.user}</span>: {c.content}
+                <div className="text-xs text-gray-500">
+                  {new Date(c.createdAt).toLocaleString()}
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>

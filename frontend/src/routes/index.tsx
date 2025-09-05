@@ -11,14 +11,12 @@ type Comment = {
 type Thread = {
   id: string;
   title: string;
-
   createdAt: string;
   comments: Comment[];
 };
 
 export const Index: React.FC = () => {
   const [threads, setThreads] = useState<Thread[]>([]);
-
   const [loading, setLoading] = useState(true);
 
   const [title, setTitle] = useState("");
@@ -29,8 +27,6 @@ export const Index: React.FC = () => {
     fetchThreads();
     // eslint-disable-next-line
   }, []);
-
-  // スレッド一覧取得
 
   const fetchThreads = async () => {
     try {
@@ -45,11 +41,6 @@ export const Index: React.FC = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchThreads();
-    // eslint-disable-next-line
-  }, []);
 
   // スレッド作成
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,9 +57,7 @@ export const Index: React.FC = () => {
       setTitle("");
       setContent("");
       setUser("");
-
       fetchThreads(); // 再読み込み
-
     } else {
       console.error("スレッド作成失敗");
     }
@@ -77,7 +66,6 @@ export const Index: React.FC = () => {
   if (loading) return <div>読み込み中...</div>;
 
   return (
-
     <div className="max-w-2xl mx-auto p-4 space-y-6">
       <h1 className="text-3xl font-bold mb-6">2ch 演習</h1>
       {/* スレッド作成フォーム */}
@@ -101,17 +89,13 @@ export const Index: React.FC = () => {
           placeholder="ユーザー名（任意）"
           value={user}
           onChange={(e) => setUser(e.target.value)}
-
           className="w-full border rounded p-2"
-
         />
         <button
           type="submit"
           className="bg-blue-500 text-white px-4 py-2 rounded"
         >
-
           スレッド作成
-
         </button>
       </form>
 
@@ -126,22 +110,36 @@ export const Index: React.FC = () => {
             >
               {thread.title}
             </Link>
-
             <div className="mt-2 space-y-1">
               {thread.comments && thread.comments.length > 0 ? (
-                thread.comments.map((c) => (
-                  <div key={c.id} className="text-sm text-gray-700">
-                    <span className="font-semibold">{c.user}</span>: {c.content}
-                  </div>
-                ))
+                thread.comments.map((c) => {
+                  const isAboned =
+                    c.user === "あぼーん" || c.content === "あぼーん";
+                  return (
+                    <div
+                      key={c.id}
+                      className="text-sm text-gray-700 border-b pb-1"
+                    >
+                      {isAboned ? (
+                        <div className="text-gray-400 italic">あぼーん</div>
+                      ) : (
+                        <>
+                          <span className="font-semibold">{c.user}</span>:{" "}
+                          {c.content}
+                        </>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
-                <div className="text-sm text-gray-500">まだコメントはありません</div>
+                <div className="text-sm text-gray-500">
+                  まだコメントはありません
+                </div>
               )}
-
             </div>
           </div>
         ))}
       </div>
     </div>
-  );
-};
+  );  
+}; // ← ここで関数を閉じる
