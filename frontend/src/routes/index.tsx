@@ -27,6 +27,10 @@ export const Index: React.FC = () => {
   const [adminTokenInput, setAdminTokenInput] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // ページング
+  const [page, setPage] = useState(1);
+  const THREADS_PER_PAGE = 4;
+
   useEffect(() => {
     fetchThreads();
 
@@ -72,6 +76,11 @@ export const Index: React.FC = () => {
 
   if (loading) return <div>読み込み中...</div>;
 
+  // ページング処理
+  const startIndex = (page - 1) * THREADS_PER_PAGE;
+  const paginatedThreads = threads.slice(startIndex, startIndex + THREADS_PER_PAGE);
+  const totalPages = Math.ceil(threads.length / THREADS_PER_PAGE);
+
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
       <h1 className="text-3xl font-bold mb-6">2ch 演習</h1>
@@ -110,44 +119,74 @@ export const Index: React.FC = () => {
       {/* スレッド一覧 */}
       <div className="space-y-6">
         <h2 className="text-xl font-bold">スレッド一覧</h2>
-        {threads.map((thread) => (
-          <div key={thread.id} className="border-b pb-4">
-            <Link
-              to={`/threads/${thread.id}`}
-              className="text-blue-600 font-semibold hover:underline"
-            >
-              {thread.title}
-            </Link>
-            <div className="mt-2 space-y-1">
-              {thread.comments && thread.comments.length > 0 ? (
-                thread.comments.map((c) => {
-                  const isAboned =
-                    c.user === "あぼーん" || c.content === "あぼーん";
-                  return (
-                    <div
-                      key={c.id}
-                      className="text-sm text-gray-700 border-b pb-1"
-                    >
-                      {isAboned ? (
-                        <div className="text-gray-400 italic">あぼーん</div>
-                      ) : (
-                        <>
-                          <span className="font-semibold">{c.user}</span>:{" "}
-                          {c.content}
-                        </>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-sm text-gray-500">
-                  まだコメントはありません
-                </div>
-              )}
+        {paginatedThreads.length === 0 ? (
+          <div className="text-gray-500">スレッドがありません。</div>
+        ) : (
+          paginatedThreads.map((thread) => (
+            <div key={thread.id} className="border-b pb-4">
+              <Link
+                to={`/threads/${thread.id}`}
+                className="text-blue-600 font-semibold hover:underline"
+              >
+                {thread.title}
+              </Link>
+              <div className="mt-2 space-y-1">
+                {thread.comments && thread.comments.length > 0 ? (
+                  thread.comments.map((c) => {
+                    const isAboned =
+                      c.user === "あぼーん" || c.content === "あぼーん";
+                    return (
+                      <div
+                        key={c.id}
+                        className="text-sm text-gray-700 border-b pb-1"
+                      >
+                        {isAboned ? (
+                          <div className="text-gray-400 italic">あぼーん</div>
+                        ) : (
+                          <>
+                            <span className="font-semibold">{c.user}</span>:{" "}
+                            {c.content}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    まだコメントはありません
+                  </div>
+                )}
+              </div>
+              <div className="text-xs text-gray-500">
+                {new Date(thread.createdAt).toLocaleString()}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
+
+      {/* ページネーション */}
+      {totalPages > 1 && (
+        <div className="flex justify-center space-x-2 mt-4">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+          >
+            ← 前
+          </button>
+          <span className="px-2">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+          >
+            次 →
+          </button>
+        </div>
+      )}
 
       {/* 管理者ログインフォーム or ログアウト */}
       <div className="mt-10 border-t pt-4">
@@ -192,8 +231,10 @@ export const Index: React.FC = () => {
             >
               ログアウト
             </button>
-            <Link to="/admin" className="text-red-500 underline">管理者画面へ</Link>
-          </div>
+            <Link to="/admin" className="text-red-500 underline ml-4">
+              管理者画面へ
+            </Link>
+           </div>
         )}
       </div>
     </div>
