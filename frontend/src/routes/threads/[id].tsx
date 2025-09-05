@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 
 type Comment = {
   id: string;
@@ -17,6 +17,9 @@ type Thread = {
 
 const ThreadDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+
   const [thread, setThread] = useState<Thread | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +29,10 @@ const ThreadDetail: React.FC = () => {
   // 管理者ログイン用
   const [adminTokenInput, setAdminTokenInput] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // 削除依頼フォームの状態
+  const [openForm, setOpenForm] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
 
   useEffect(() => {
     fetchThread();
@@ -45,6 +52,16 @@ const ThreadDetail: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // ✅ highlightId のコメントへスクロール
+  useEffect(() => {
+    if (highlightId && thread?.comments) {
+      const target = document.getElementById(`comment-${highlightId}`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [highlightId, thread]);
 
   // コメント投稿
   const handleCommentSubmit = async (e: React.FormEvent) => {
@@ -69,7 +86,7 @@ const ThreadDetail: React.FC = () => {
     }
   };
 
-  // コメント削除
+  // コメント削除（管理者用）
   const handleDelete = async (commentId: string) => {
     const token = localStorage.getItem("adminToken");
     if (!token) return alert("管理者トークンが必要です");
@@ -91,6 +108,25 @@ const ThreadDetail: React.FC = () => {
     }
   };
 
+  // 削除依頼送信（一般ユーザー用）
+  const handleDeleteRequest = async (commentId: string) => {
+    if (!reason) return alert("理由を入力してください");
+
+    const res = await fetch("http://localhost:8787/api/delete-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId: id, commentId, reason }),
+    });
+
+    if (res.ok) {
+      alert("削除依頼を送信しました");
+      setOpenForm(null);
+      setReason("");
+    } else {
+      alert("削除依頼送信に失敗しました");
+    }
+  };
+
   if (loading) return <div>読み込み中...</div>;
   if (!thread) return <div>スレッドが見つかりません</div>;
 
@@ -106,38 +142,84 @@ const ThreadDetail: React.FC = () => {
       <div className="space-y-2">
         {thread.comments && thread.comments.length > 0 ? (
           thread.comments.map((c) => {
-            const isAboned = c.user === "あぼーん" || c.content === "あぼーん";
+            const isAboned =
+              c.user === "あぼーん" || c.content === "あぼーん";
             return (
               <div
                 key={c.id}
-                className="flex justify-between items-center border-b pb-1 text-sm"
+                id={`comment-${c.id}`} // ✅ スクロール用にID付与
+                className={`border-b pb-2 text-sm space-y-1 ${
+                  c.id === highlightId ? "bg-yellow-100" : ""
+                }`}
               >
-                {isAboned ? (
-                  <div className="text-gray-400 italic">あぼーん</div>
-                ) : (
+                {/* コメント内容 */}
+                <div className="flex justify-between items-center">
+                  {isAboned ? (
+                    <div className="text-gray-400 italic">あぼーん</div>
+                  ) : (
+                    <>
+                      <span className="font-semibold">{c.user}</span>:{" "}
+                      {c.content}
+                    </>
+                  )}
+
+                  {/* 管理者用削除ボタン */}
+                  {isAdmin && !isAboned && (
+                    <button
+                      onClick={() => handleDelete(c.id)}
+                      className="ml-2 text-red-500 text-xs"
+                    >
+                      削除
+                    </button>
+                  )}
+                </div>
+
+                {/* 一般ユーザー用 削除依頼ボタン */}
+                {!isAboned && (
                   <>
-                    <span className="font-semibold">{c.user}</span>:{" "}
-                    {c.content}
+                    <button
+                      onClick={() =>
+                        setOpenForm(openForm === c.id ? null : c.id)
+                      }
+                      className="text-xs text-red-400 underline"
+                    >
+                      削除依頼
+                    </button>
+
+                    {/* 削除依頼フォーム */}
+                    {openForm === c.id && (
+                      <div className="mt-2 p-2 border rounded bg-gray-50">
+                        <textarea
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          placeholder="削除依頼の理由を書いてください"
+                          className="w-full border p-2 rounded"
+                        />
+                        <button
+                          onClick={() => handleDeleteRequest(c.id)}
+                          className="bg-red-500 text-white px-3 py-1 rounded mt-2"
+                        >
+                          送信
+                        </button>
+                      </div>
+                    )}
                   </>
-                )}
-                {isAdmin && !isAboned && (
-                  <button
-                    onClick={() => handleDelete(c.id)}
-                    className="ml-2 text-red-500 text-xs"
-                  >
-                    削除
-                  </button>
                 )}
               </div>
             );
           })
         ) : (
-          <div className="text-gray-500 text-sm">まだコメントはありません</div>
+          <div className="text-gray-500 text-sm">
+            まだコメントはありません
+          </div>
         )}
       </div>
 
       {/* コメント投稿フォーム */}
-      <form onSubmit={handleCommentSubmit} className="space-y-2 border p-4 rounded">
+      <form
+        onSubmit={handleCommentSubmit}
+        className="space-y-2 border p-4 rounded"
+      >
         <h2 className="text-lg font-bold">コメントを投稿</h2>
         <textarea
           placeholder="コメント内容"
@@ -203,6 +285,9 @@ const ThreadDetail: React.FC = () => {
             >
               ログアウト
             </button>
+            <Link to="/admin" className="ml-4 text-red-500 underline">
+              管理者画面へ
+            </Link>
           </div>
         )}
       </div>
