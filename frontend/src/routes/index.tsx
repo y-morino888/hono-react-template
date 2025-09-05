@@ -192,6 +192,7 @@ export const Index: React.FC = () => {
             >
               ログアウト
             </button>
+            <Link to="/admin" className="text-red-500 underline">管理者画面へ</Link>
           </div>
         )}
       </div>

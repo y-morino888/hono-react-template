@@ -234,3 +234,40 @@ api.delete("/threads/:threadId/comments/:commentId", async (c) => {
     return c.json({ error: "コメントのあぼーんに失敗しました" }, 500);
   }
 });
+
+// 📌 削除依頼の新規作成
+api.post("/delete-requests", async (c) => {
+  try {
+    const { threadId, commentId, reason } = await c.req.json();
+
+    if (!commentId || !reason) {
+      return c.json({ error: "commentId と理由は必須です" }, 400);
+    }
+
+    const request = await prisma.deleteRequest.create({
+      data: {
+        threadId,
+        commentId,
+        reason,
+      },
+    });
+
+    return c.json(request);
+  } catch (err) {
+    console.error("削除依頼エラー:", err);
+    return c.json({ error: "削除依頼に失敗しました" }, 500);
+  }
+});
+
+// 📌 削除依頼一覧取得（管理者確認用）
+api.get("/delete-requests", async (c) => {
+  try {
+    const requests = await prisma.deleteRequest.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    return c.json(requests);
+  } catch (err) {
+    console.error("削除依頼取得エラー:", err);
+    return c.json({ error: "取得に失敗しました" }, 500);
+  }
+});
