@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 
 type Comment = {
   id: string;
@@ -11,52 +11,83 @@ type Comment = {
 type Thread = {
   id: string;
   title: string;
+  createdAt: string;
   comments: Comment[];
 };
 
 const ThreadDetail: React.FC = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const [thread, setThread] = useState<Thread | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // フォーム用 state
-  const [content, setContent] = useState("");
-  const [user, setUser] = useState("");
+  const [commentContent, setCommentContent] = useState("");
+  const [commentUser, setCommentUser] = useState("");
+
+  // 管理者ログイン用
+  const [adminTokenInput, setAdminTokenInput] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetchThread();
+    const savedToken = localStorage.getItem("adminToken");
+    if (savedToken) setIsAdmin(true);
+    // eslint-disable-next-line
+  }, [id]);
 
   const fetchThread = async () => {
     try {
       const res = await fetch(`http://localhost:8787/api/threads/${id}`);
-      if (!res.ok) throw new Error("スレッド取得失敗");
       const data = await res.json();
       setThread(data);
     } catch (err) {
-      console.error(err);
+      console.error("スレッド取得失敗:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (id) fetchThread();
-  }, [id]);
-
-  // コメント投稿処理
-  const handleSubmit = async (e: React.FormEvent) => {
+  // コメント投稿
+  const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content) return;
+    if (!commentContent) return;
 
-    const res = await fetch(`http://localhost:8787/api/threads/${id}/comments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, user }),
-    });
+    const res = await fetch(
+      `http://localhost:8787/api/threads/${id}/comments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: commentContent, user: commentUser }),
+      }
+    );
 
     if (res.ok) {
-      setContent("");
-      setUser("");
-      fetchThread(); // 再読み込み
+      setCommentContent("");
+      setCommentUser("");
+      fetchThread();
     } else {
       console.error("コメント投稿失敗");
+    }
+  };
+
+  // コメント削除
+  const handleDelete = async (commentId: string) => {
+    const token = localStorage.getItem("adminToken");
+    if (!token) return alert("管理者トークンが必要です");
+
+    const res = await fetch(
+      `http://localhost:8787/api/threads/${id}/comments/${commentId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (res.ok) {
+      fetchThread();
+    } else {
+      console.error("コメント削除失敗");
     }
   };
 
@@ -65,40 +96,60 @@ const ThreadDetail: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold mb-4">{thread.title}</h1>
+      <Link to="/" className="text-blue-600 hover:underline">
+        ← 戻る
+      </Link>
+
+      <h1 className="text-2xl font-bold">{thread.title}</h1>
 
       {/* コメント一覧 */}
-      <div className="space-y-4">
-        {thread.comments.map((c) => (
-          <div key={c.id} className="border-b pb-2">
-            {c.user === "あぼーん" || c.content === "あぼーん" ? (
-              <div className="text-gray-400 italic">あぼーん</div>
-            ) : (
-              <>
-                <span className="font-semibold">{c.user}</span>: {c.content}
-                <div className="text-xs text-gray-500">
-                  {new Date(c.createdAt).toLocaleString()}
-                </div>
-              </>
-            )}
-          </div>
-        ))}
+      <div className="space-y-2">
+        {thread.comments && thread.comments.length > 0 ? (
+          thread.comments.map((c) => {
+            const isAboned = c.user === "あぼーん" || c.content === "あぼーん";
+            return (
+              <div
+                key={c.id}
+                className="flex justify-between items-center border-b pb-1 text-sm"
+              >
+                {isAboned ? (
+                  <div className="text-gray-400 italic">あぼーん</div>
+                ) : (
+                  <>
+                    <span className="font-semibold">{c.user}</span>:{" "}
+                    {c.content}
+                  </>
+                )}
+                {isAdmin && !isAboned && (
+                  <button
+                    onClick={() => handleDelete(c.id)}
+                    className="ml-2 text-red-500 text-xs"
+                  >
+                    削除
+                  </button>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-gray-500 text-sm">まだコメントはありません</div>
+        )}
       </div>
 
       {/* コメント投稿フォーム */}
-      <form onSubmit={handleSubmit} className="space-y-2 border p-4 rounded">
-        <h2 className="font-bold">コメントを投稿する</h2>
+      <form onSubmit={handleCommentSubmit} className="space-y-2 border p-4 rounded">
+        <h2 className="text-lg font-bold">コメントを投稿</h2>
         <textarea
           placeholder="コメント内容"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
+          value={commentContent}
+          onChange={(e) => setCommentContent(e.target.value)}
           className="w-full border p-2 rounded"
         />
         <input
           type="text"
           placeholder="ユーザー名（任意）"
-          value={user}
-          onChange={(e) => setUser(e.target.value)}
+          value={commentUser}
+          onChange={(e) => setCommentUser(e.target.value)}
           className="w-full border p-2 rounded"
         />
         <button
@@ -108,6 +159,53 @@ const ThreadDetail: React.FC = () => {
           投稿
         </button>
       </form>
+
+      {/* 管理者ログインフォーム */}
+      <div className="mt-10 border-t pt-4">
+        <h2 className="text-lg font-bold">管理者</h2>
+        {!isAdmin ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (adminTokenInput) {
+                localStorage.setItem("adminToken", adminTokenInput);
+                setIsAdmin(true);
+                setAdminTokenInput("");
+              }
+            }}
+            className="space-y-2"
+          >
+            <input
+              type="password"
+              placeholder="管理者トークンを入力"
+              value={adminTokenInput}
+              onChange={(e) => setAdminTokenInput(e.target.value)}
+              className="border p-2 w-full rounded"
+            />
+            <button
+              type="submit"
+              className="bg-red-500 text-white px-4 py-2 rounded"
+            >
+              ログイン
+            </button>
+          </form>
+        ) : (
+          <div>
+            <p className="mb-2 text-green-600 font-semibold">
+              管理者ログイン中
+            </p>
+            <button
+              onClick={() => {
+                localStorage.removeItem("adminToken");
+                setIsAdmin(false);
+              }}
+              className="bg-gray-500 text-white px-4 py-2 rounded"
+            >
+              ログアウト
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
